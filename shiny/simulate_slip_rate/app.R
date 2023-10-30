@@ -5,6 +5,9 @@ library(tidyverse)
 source("../../scripts/current_date_code.R")
 source("../../R/slip_rate_from_dwell.R")
 source("../../R/run_intercept_model.R")
+source("../../R/reconstruct_flow_in_detail.R")
+source("../../R/plot_flow_diagrams.R")
+
 
 origin_host_dir = '../../.'
 #read in standard performance numbers
@@ -45,6 +48,8 @@ ui <- fluidPage(
   ),
   
   h1('Step 2: Isotonic regression adjusted Senstivity table'),
+  p('Assumption: ensitivity estimates are nondecreasing by increasing stage for each cancer type;
+  estimates were adjusted by isotonic regression weighted by the number of observations available per stage.'),
   dataTableOutput("sens_table"),
   
   h2("Dictionary of variables"),
@@ -69,11 +74,15 @@ ui <- fluidPage(
            ),
            
            column(6, 
-                  sliderInput("screen_interval", label = h3("Screen interval"), min = 1, 
+                  sliderInput("screen_interval", label = h3("Screen interval (years)"), min = 0.5, 
                               max = 10, value = 1))
   ),
   
+  # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval
+  plotOutput("weibull_dist_plot"),
+  
   h1('Step 4: Simulate performance'),
+  downloadButton("downloadTable4", "Download Table 4"),
   dataTableOutput("simulated_data"),
   h2("Dictionary of variables"),
   p(HTML('Cancer:	Cancer sensitivity group <br>
@@ -91,17 +100,28 @@ ui <- fluidPage(
     scan: Type of screening year: incident/prevalent/no screening <br>
     mode_found: cfdna or soc (matches found_clinical) <br>
     aggressive:	dwell time scenario in words')),
+  
+  h1('Step 5: Reconstruct flow diagrams'),
+  plotOutput("flow_diagram"),
 )
 
 server <- function(input, output) {
+  
   dwell_standard_model <- reactive({
-    req(input$loadFile)
-    infile <- input$file
-    if (is.null(infile))
-      return(NULL)
+    # Default file path
+    default_filepath <- "/Users/cgu3/Downloads/dwell_model_all_df (1).csv"
     
-    read.csv(infile$datapath)
+    # Check if the user has uploaded a new file
+    
+    infile <- input$file
+    # If user has uploaded a file, use that; otherwise, use the default file
+    if (is.null(infile$datapath)) {
+      return(read.csv(default_filepath))
+    } else {
+      return(read.csv(infile$datapath))
+    }
   })
+  
   
   output$table <- renderDT({
     datatable(dwell_standard_model())
@@ -111,6 +131,19 @@ server <- function(input, output) {
   output$sens_table <- renderDataTable({
     incidence_sens_source
   })
+  
+  
+  # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval
+  output$weibull_dist_plot <- renderPlot({
+    weibull_shape<-input$weibull_shape
+    screen_interval<-input$screen_interval
+    x<-seq(0,5,0.1)
+    y<-dweibull(x,shape=weibull_shape,scale=screen_interval)
+    plot(x,y,type="l",xlab="years",ylab="failure probability")
+    abline(v=screen_interval,col="red")
+    abline(h=0.5,col="red")
+  })
+  
   
   
   # add widgets control screen interval and weibull_shape or failure time distribution
@@ -133,7 +166,8 @@ server <- function(input, output) {
   })
   
   
-  # generate simulated performance
+  
+  # Step 4: Simulate performance
   scenerios <- reactive({
     
     dwell_slip_rate <- dwell_slip_rate()
@@ -227,6 +261,87 @@ server <- function(input, output) {
   output$simulated_data <- renderDataTable({
     scenerios()
   })
+  
+  # download the simulated data
+  output$downloadTable4 <- downloadHandler(
+    filename = function() {
+      "text_data_set.csv"
+    },
+    content = function(file) {
+      write.csv(scenerios(), file, row.names = FALSE)
+    }
+  )
+  
+  
+  
+  
+  # plot flow diagram Figure 1 in paper
+  plot_flow_diagram <- reactive({
+    
+    global_figure_scale<-7.5
+    global_box_scale<-0.045
+    global_text_scale<-1.35
+    color_caught=c("intercept"="plum","clinical"="grey80")
+    
+    slip_rate_df <- dwell_slip_rate()
+    
+    diagram_setup<-set_up_diagram_clean(color_caught=color_caught)
+    par(mfrow=c(2,2))
+    # par(mar = c(0, 0, 1, 1))  # Adjust the margin (bottom, left, top, right)
+    # par(oma = c(0, 0, 2, 0))  # Adjust the outer margin (bottom, left, top, right)
+    
+    #1A
+    my_locus<-blank_intercept_para(diagram_setup,"State-Transition Graph",local_box_size=global_box_scale)
+    
+    #simply fill in the boxes with the identity
+    text(diagram_setup$map$x,diagram_setup$map$y,diagram_setup$map$name,cex=global_text_scale)
+    
+    #1B
+    dw_scenario<-0  #start with pure scenario
+    
+    local_slip_rate_df <- slip_rate_df %>% 
+      filter(scenario==dw_scenario)
+    
+    my_title<-"No Interception"
+    no_intercept_flow <- intercept_with_flow(incidence_sens_source,local_slip_rate_df,
+                                           intercept_start_at_stage=0)
+    #start plotting
+    my_locus <- blank_intercept_para(diagram_setup,my_title,local_box_size=global_box_scale)
+    plot_object_flow_tuned(no_intercept_flow,diagram_setup,my_locus,flow_up_to_stage=4,cex_scale=global_text_scale)
+    
+    
+    ##1C
+    dw_scenario<-0  #start with pure scenario
+    
+    local_slip_rate_df<-slip_rate_df %>% 
+      filter(scenario==dw_scenario)
+    
+    my_title<-"Interception Model"
+    mis_flow<-intercept_with_flow(incidence_sens_source,local_slip_rate_df,
+                                  intercept_start_at_stage=4)
+    my_locus<-blank_intercept_para(diagram_setup,my_title,local_box_size=global_box_scale)
+    plot_object_flow_tuned(mis_flow,diagram_setup,my_locus,flow_up_to_stage=4,cex_scale=global_text_scale)
+    
+    ## 1D
+    flow_up_to_stage<-4
+    my_title<-"Interception Model: Fast"
+    #now use a finite slip rate scenario
+    dw_scenario<-3  #start with pure scenario
+    local_slip_rate_df<-slip_rate_df %>% 
+      filter(scenario==dw_scenario)
+    
+    fast_flow<-intercept_with_flow(incidence_sens_source,local_slip_rate_df,
+                                   intercept_start_at_stage=4)
+    #start plotting
+    #start plotting
+    my_locus<-blank_intercept_para(diagram_setup,my_title,local_box_size=global_box_scale)
+    final_plot <- plot_object_flow_tuned(fast_flow,diagram_setup,my_locus,flow_up_to_stage=4,cex_scale=global_text_scale)
+    return(final_plot)
+  })
+  
+  output$flow_diagram <- renderPlot({
+    plot_flow_diagram()
+  }, width = 1000, height = 800)
 
 }
 
