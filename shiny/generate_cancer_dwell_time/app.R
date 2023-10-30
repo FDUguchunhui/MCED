@@ -41,7 +41,7 @@ ui <- fluidPage(
   
   dt_output('Table 2: Dwell time', 'dwell_time'),
   
-  p('Scenarios 1: Very slow, 2: Slow, 3: Fast, 4: Aggressively fast'),
+  p('Scenarios | 0: Maximum interception scenario (MIS) 1: Very slow, 2: Slow, 3: Fast, 4: Aggressively fast'),
   
   h1("Table 3: All data"),
   
@@ -84,12 +84,7 @@ server <- function(input, output) {
     output$dwell_model_all_df <- renderDataTable(dwell_model_all_df(), options = list(pageLength = 10))
   })
   
-  # dwell_model_all_df <- reactive({dwell_model_group_df %>% 
-  #   rename(dwell_group=group) %>%
-  #   full_join(dwell_model_timing_df %>% rename(dwell_group=group)) %>%
-  #   mutate(number_stage=match(Stage,xStage))
-  # })
-  
+
   output$dwell_model_all_df <- renderDataTable(dwell_model_all_df(), options = list(
     pageLength = 10))
   
