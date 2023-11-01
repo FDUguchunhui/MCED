@@ -29,6 +29,7 @@ incidence_sens_source <- iso_sens_joined %>%
   filter(Stage != "NotStaged") %>%
   mutate(iso_sens = sens)
 
+
 #keep not staged for adding back
 incidence_excluded_source <- iso_sens_joined %>%
   filter(Stage == "NotStaged")
@@ -133,13 +134,18 @@ ui <- fluidPage(
   ),
   
   h1('Step 5: Reconstruct flow diagrams'),
-  plotOutput("flow_diagram", height = "1000px"),
+  plotOutput("flow_diagram", height = "auto"),
   
   h1('Step 6: Utility Sankey plot'),
   selectInput("sankey_plot_scenario", label = h3("Select scenario"), 
               choices = list("MIS" = 1, "Very Slow" = 2, "Slow" = 3, 'Fast'=4, 'Aggressively fast'=5), 
               selected = 1),
-  plotOutput("utility_sankey_plot"),
+  plotOutput("utility_sankey_plot", height = "auto"),
+  
+  
+  h1('Step 7: Sensitivity analysis by cancer'),
+  dataTableOutput("sensitivity_analysis"),
+  
 )
 
 server <- function(input, output) {
@@ -229,6 +235,9 @@ server <- function(input, output) {
     k <- 1
     for (dw_scenario in 1:4) {
       print(k)
+      
+      browser()
+      
       local_performance <- run_intercept_model(incidence_sens_source,
                                                dwell_slip_rate %>%
                                                  filter(scenario == dw_scenario))
@@ -280,6 +289,8 @@ server <- function(input, output) {
       my_list[[k]] <- prevalent_performance
       k <- k + 1
     }
+    
+    browser()
     
     #this is the MIS scenario where schedule sensitivity is perfect so slip rates are 0
     optimal_performance <- run_intercept_model(incidence_sens_source,
@@ -360,6 +371,9 @@ server <- function(input, output) {
   #################### plot flow diagram Figure 1 in paper ##################################
   ###########################################################################################
   plot_flow_diagram <- reactive({
+    
+    browser()
+    
     global_figure_scale <- 7.5
     global_box_scale <- 0.045
     global_text_scale <- 1.35
@@ -390,6 +404,8 @@ server <- function(input, output) {
     local_slip_rate_df <- slip_rate_df %>%
       filter(scenario == dw_scenario)
     
+    browser()
+    
     my_title <- "No Interception"
     no_intercept_flow <-
       intercept_with_flow(incidence_sens_source,
@@ -413,7 +429,7 @@ server <- function(input, output) {
     local_slip_rate_df <- slip_rate_df %>%
       filter(scenario == dw_scenario)
     
-    my_title <- "Interception Model"
+    my_title <- "Interception Model: MIS"
     mis_flow <-
       intercept_with_flow(incidence_sens_source,
                           local_slip_rate_df,
@@ -460,22 +476,27 @@ server <- function(input, output) {
   }, width = 1000, height = 800)
   
   
+  
   ###########################################################################################
   #################### plot flow diagram Figure 3 in paper ##################################
   ###########################################################################################
   
-  plot_sankey_plot <- reactive({
+  a_intercept <-reactive({
     text_levels <- c("MIS", "VSlow", "Slow", "Fast", "AggFast")
-    cStage <- c("NS", "I", "II", "III", "IV")
+    scenario_code <-text_levels[as.integer(input$sankey_plot_scenario)]
+    rich_survival() %>% filter(scan == "incident", aggressive == scenario_code)
+  })
+
     
-    rich_survival <- rich_survival()
+  
+  plot_sankey_plot <- reactive({
+    cStage <- c("NS", "I", "II", "III", "IV")
+    text_levels <- c("MIS", "VSlow", "Slow", "Fast", "AggFast")
+  
     scenario_code <-text_levels[as.integer(input$sankey_plot_scenario)]
     
-   
-    
-    
-    a_intercept <-
-      rich_survival %>% filter(scan == "incident", aggressive == scenario_code)
+    # a_intercept contains intercepted cases at each stage and cancer of all usual care diagnosed cancers during incidence round
+    a_intercept <- a_intercept()
     
     #stage-shift
     intercept_shifted <- a_intercept %>%
@@ -640,7 +661,27 @@ server <- function(input, output) {
   
   output$utility_sankey_plot <- renderPlot({
     plot_sankey_plot()
-  },  width = 1000, height = 1000)
+  },  width = 1600, height = 1000)
+  
+  
+  
+  ###########################################################################################
+  #################### display sensitivity table         ##################################
+  ###########################################################################################
+  
+  
+  sens_table <- reactive({
+    a_intercept() %>% filter(found_clinical==1) %>% group_by(Cancer, clinical) %>%
+      mutate(total_at_corresponding_prequel=sum(caught)) %>%
+      mutate(prob_at_prequel=caught/total_at_corresponding_prequel) %>% 
+      select(Cancer,clinical, prequel, prob_at_prequel) %>% arrange(Cancer, clinical, prequel)
+  })
+  
+  output$sensitivity_analysis <- renderDataTable({
+    sens_table()
+  })
+  
+  
   
 }
 
