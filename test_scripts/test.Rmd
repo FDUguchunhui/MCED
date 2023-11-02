@@ -1,0 +1,27 @@
+---
+title: "test_scripts"
+output: html_document
+date: "2023-10-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+
+
+```{r}
+a_intercept <- read_csv('a_intercept.csv')
+head(a_intercept)
+```
+
+
+```{r}
+a_intercept %>% filter(found_clinical==1) %>% group_by(Cancer, clinical) %>% mutate(total_at_corresponding_prequel=sum(caught)) %>%   mutate(prob_at_prequel=caught/total_at_corresponding_prequel) %>% select(Cancer,clinical, prequel, prob_at_prequel) %>% arrange(Cancer, clinical, prequel)
+```
+
