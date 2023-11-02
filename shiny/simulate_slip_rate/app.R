@@ -4,13 +4,17 @@ library(tidyverse)
 library(ggalluvial)
 library(patchwork)
 
-source("../../scripts/current_date_code.R")
-source("../../R/slip_rate_from_dwell.R")
-source("../../R/run_intercept_model.R")
-source("../../R/reconstruct_flow_in_detail.R")
-source("../../R/plot_flow_diagrams.R")
-source("../../R/utility_sankey_plot.R")
+# source R files with local argument set to TRUE otherwise function from sourced file cannot access shiny app environment
+source("../../scripts/current_date_code.R", local = TRUE)
+source("../../R/slip_rate_from_dwell.R", local = TRUE)
+source("../../R/run_intercept_model.R", local = TRUE)
+source("../../R/reconstruct_flow_in_detail.R", local = TRUE)
+source("../../R/plot_flow_diagrams.R", local = TRUE)
+source("../../R/utility_sankey_plot.R", local = TRUE)
 
+
+
+# global variables -----------------------------------------------------------
 
 origin_host_dir = '../../.'
 #read in standard performance numbers
@@ -34,9 +38,9 @@ incidence_sens_source <- iso_sens_joined %>%
 incidence_excluded_source <- iso_sens_joined %>%
   filter(Stage == "NotStaged")
 
-
-
+# ui.R ----------------------------------------------------------------------
 ui <- fluidPage(
+  
   # Application title
   h1("Interception model"),
   p(
@@ -144,11 +148,16 @@ ui <- fluidPage(
   
   
   h1('Step 7: Sensitivity analysis by cancer'),
-  dataTableOutput("sensitivity_analysis"),
-  
+  downloadButton("download_stage_shift_table", "Download stage shift table"),
+  dataTableOutput("stage_shifting_table"),
 )
 
+
+# server.R ------------------------------------------------------------------
 server <- function(input, output) {
+
+  
+  # dwell standard model table reactive ------------------------------------------------
   dwell_standard_model <- reactive({
     # Default file path
     default_filepath <-
@@ -166,17 +175,19 @@ server <- function(input, output) {
   })
   
   
+  
+  # Step1: output the dwell standard model table ------------------------------------------------
   output$table <- renderDT({
     datatable(dwell_standard_model())
   })
   
-  
+  # Step2: output sensitivity table ------------------------------------------------
   output$sens_table <- renderDataTable({
     incidence_sens_source
   })
   
   
-  # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval
+  # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval ------------------------------------------------
   output$weibull_dist_plot <- renderPlot({
     weibull_shape <- input$weibull_shape
     screen_interval <- input$screen_interval
@@ -192,8 +203,8 @@ server <- function(input, output) {
   })
   
   
-  
-  # add widgets control screen interval and weibull_shape or failure time distribution
+  # Step 3: Set dwell time parameters ------------------------------------------------
+  ## dwell slip rate reactive ------------------------------------------------
   dwell_slip_rate <- reactive({
     exact_slip_rate_from_dwell(
       dwell_standard_model(),
@@ -202,7 +213,7 @@ server <- function(input, output) {
     )
   })
   
-  
+  ## dwell prevalent rate reactive ------------------------------------------------
   #generate prevalent slip rate by clever use of very large interval and multiplying expectation
   long_interval <- 100
   dwell_prevalent_rate <- reactive({
@@ -213,6 +224,7 @@ server <- function(input, output) {
     )
   })
   
+  ## dwell no rate reactive ------------------------------------------------
   #no screening is happening, therefore nothing is ever intercepted
   dwell_no_rate <- reactive({
     dwell_slip_rate() %>%
@@ -222,7 +234,7 @@ server <- function(input, output) {
   
   
   
-  # Step 4: Simulate performance
+  # Step 4: Simulate performance ------------------------------------------------
   rich_survival <- reactive({
     dwell_slip_rate <- dwell_slip_rate()
     dwell_no_rate <- dwell_no_rate()
@@ -236,7 +248,7 @@ server <- function(input, output) {
     for (dw_scenario in 1:4) {
       print(k)
       
-      browser()
+      #browser()
       
       local_performance <- run_intercept_model(incidence_sens_source,
                                                dwell_slip_rate %>%
@@ -290,7 +302,7 @@ server <- function(input, output) {
       k <- k + 1
     }
     
-    browser()
+    #browser()
     
     #this is the MIS scenario where schedule sensitivity is perfect so slip rates are 0
     optimal_performance <- run_intercept_model(incidence_sens_source,
@@ -367,12 +379,10 @@ server <- function(input, output) {
   
   
   
-  ###########################################################################################
-  #################### plot flow diagram Figure 1 in paper ##################################
-  ###########################################################################################
+
+  # Step 5: plot flow diagram Figure 1 in paper -----------------------------------------
+
   plot_flow_diagram <- reactive({
-    
-    browser()
     
     global_figure_scale <- 7.5
     global_box_scale <- 0.045
@@ -381,7 +391,7 @@ server <- function(input, output) {
                      "clinical" = "grey80")
     
     slip_rate_df <- dwell_slip_rate()
-    
+
     diagram_setup <- set_up_diagram_clean(color_caught = color_caught)
     par(mfrow = c(2, 2))
     # par(mar = c(0, 0, 1, 1))  # Adjust the margin (bottom, left, top, right)
@@ -404,7 +414,7 @@ server <- function(input, output) {
     local_slip_rate_df <- slip_rate_df %>%
       filter(scenario == dw_scenario)
     
-    browser()
+    #browser()
     
     my_title <- "No Interception"
     no_intercept_flow <-
@@ -477,9 +487,7 @@ server <- function(input, output) {
   
   
   
-  ###########################################################################################
-  #################### plot flow diagram Figure 3 in paper ##################################
-  ###########################################################################################
+  # Step 6: plot flow diagram Figure 3 in paper -----------------------------------------
   
   a_intercept <-reactive({
     text_levels <- c("MIS", "VSlow", "Slow", "Fast", "AggFast")
@@ -665,21 +673,35 @@ server <- function(input, output) {
   
   
   
-  ###########################################################################################
-  #################### display sensitivity table         ##################################
-  ###########################################################################################
-  
+  # Step 7: display stage shifting table -----------------------------
   
   sens_table <- reactive({
-    a_intercept() %>% filter(found_clinical==1) %>% group_by(Cancer, clinical) %>%
-      mutate(total_at_corresponding_prequel=sum(caught)) %>%
-      mutate(prob_at_prequel=caught/total_at_corresponding_prequel) %>% 
-      select(Cancer,clinical, prequel, prob_at_prequel) %>% arrange(Cancer, clinical, prequel)
+    a_intercept() %>% filter(found_clinical == 1) %>% group_by(Cancer, clinical) %>%
+      mutate(total_at_corresponding_prequel = sum(caught)) %>%
+      mutate(prob_at_prequel = caught / total_at_corresponding_prequel) %>%
+      mutate(prob_at_prequel_percentage = scales::percent(prob_at_prequel, accuracy = 0.01)) %>%  
+      select(Cancer, clinical, prequel, prob_at_prequel_percentage) %>% arrange(Cancer, clinical, prequel) %>%
+      rename(early_detection = prequel, prob = prob_at_prequel_percentage) %>% 
+      pivot_wider(names_from = clinical, values_from = prob) %>%
+      arrange(Cancer, early_detection) %>% 
+      filter(!if_all(c("1", "2", "3", "4"), ~ .x == "")) %>% 
+      rename(`Stage 1` = `1`, `Stage 2` = `2`, `Stage 3` = `3`, `Stage 4` = `4`)
+    
   })
   
-  output$sensitivity_analysis <- renderDataTable({
+  output$stage_shifting_table <- renderDataTable({
     sens_table()
   })
+  
+  
+  output$download_stage_shift_table <- downloadHandler(
+    filename = function() {
+      "stage_shift_table.csv"
+    },
+    content = function(file) {
+      write.csv(sens_table(), file, row.names = FALSE)
+    }
+  )
   
   
   
