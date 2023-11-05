@@ -22,6 +22,11 @@ head(a_intercept)
 
 
 ```{r}
-a_intercept %>% filter(found_clinical==1) %>% group_by(Cancer, clinical) %>% mutate(total_at_corresponding_prequel=sum(caught)) %>%   mutate(prob_at_prequel=caught/total_at_corresponding_prequel) %>% select(Cancer,clinical, prequel, prob_at_prequel) %>% arrange(Cancer, clinical, prequel)
+a_intercept %>% group_by(Cancer, clinical, prequel) %>% 
+  summarise(caught=sum(caught)) %>%
+  group_by(Cancer, clinical) %>%
+  mutate(total_at_corresponding_prequel=sum(caught)) %>% 
+  mutate(prob_at_prequel=caught/total_at_corresponding_prequel) %>% 
+  select(Cancer,clinical, prequel, prob_at_prequel) %>% arrange(Cancer, clinical, prequel)
 ```
 

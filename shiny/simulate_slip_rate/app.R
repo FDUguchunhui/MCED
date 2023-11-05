@@ -676,7 +676,10 @@ server <- function(input, output) {
   # Step 7: display stage shifting table -----------------------------
   
   sens_table <- reactive({
-    a_intercept() %>% filter(found_clinical == 1) %>% group_by(Cancer, clinical) %>%
+    a_intercept() %>% 
+      group_by(Cancer, clinical, prequel) %>% summarise(caught=sum(caught)) %>%
+      mutate(total_at_corresponding_prequel=sum(caught)) %>% 
+      group_by(Cancer, clinical) %>%
       mutate(total_at_corresponding_prequel = sum(caught)) %>%
       mutate(prob_at_prequel = caught / total_at_corresponding_prequel) %>%
       mutate(prob_at_prequel_percentage = scales::percent(prob_at_prequel, accuracy = 0.01)) %>%  
