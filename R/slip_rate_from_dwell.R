@@ -16,14 +16,17 @@ integrate_slip_rate<-function(screen_interval, weibull_shape, dwell){
   # mean_of_weibull = weibull_scale*gamma(1+1/shape)
   # so weibull_scale = mean_of_weibull/gamma(1+1/shape) and mean_of_weibull = dwell, i.e. the average time of dwell/sojourn
   dwell_scale=dwell/gamma(1+1/weibull_shape)
-  tiny_delta<-365
+
   #trapezoidal integration
   # https://www.onlinemathlearning.com/trapezoid-rule.html
   # trapzoidal area: 0.5*(f(x0)+f(x1))*(x1-x0)
+  # browser()
+  tiny_delta<-365
   days_low<-seq(0,screen_interval*tiny_delta-1,by=1)/tiny_delta
   days_hi<-days_low+1/tiny_delta
-  F_by_day<-0.5*(dweibull(days_low,shape=weibull_shape,scale=dwell_scale)+dweibull(days_hi,shape=weibull_shape,scale=dwell_scale))
+  F_by_day<-0.5*(pweibull(days_low,shape=weibull_shape,scale=dwell_scale)+pweibull(days_hi,shape=weibull_shape,scale=dwell_scale))
   slip <- sum(F_by_day)*(1/(tiny_delta*screen_interval)) #day width in years
+  # slip <- pweibull(screen_interval,shape=weibull_shape,scale=dwell_scale)
   slip
 }
 
@@ -56,8 +59,22 @@ exact_slip_rate_from_dwell<-function(dwell_model_all_df,screen_interval=1,weibul
   #slip_clinical = "at stage of clinical detection"
   #assume expected is half-duration of stage of clinical detection
   #completeness in modeling
-  dwell_slip_df<-dwell_model_all_df %>%
+  
+  #dwell_model_all_df is a data frame with columns:|
+  # Cancer       | dwell_group  | scenario |  Stage |dwell_number_stage|   slip      |  slip_clinical | screen_interval
+  # -------------|--------------|----------|--------|------------------|-------------|----------------|-----------------
+  # Anus         | A            | 1        |  I     |        1         |  0.22119922 |  0.3934693     |        1
+  # Anus         | A            | 1        |  II    |        2         |  0.39346934 |  0.6321206     |        1
+  # Anus         | A            | 1        |  III   |        3         |  0.63212056 |  0.8646647     |        1
+  # Anus         | A            | 1        |  IV    |        4         |  0.63212056 |  0.8646647     |        1
+  # Colon/Rectum | A            | 1        |  I     |        1         |  0.22119922 |  0.3934693     |        1
+  # Colon/Rectum | A            | 1        |  II    |        2         |  0.39346934 |  0.6321206     |        1
+  # Colon/Rectum | A            | 1        |  III   |        3         |  0.63212056 |  0.8646647     |        1
+  # Colon/Rectum | A            | 1        |  IV    |        4         |  0.63212056 |  0.8646647     |        1
+  dwell_slip_df<-dwell_model_all_df %>% 
     mutate(slip = sapply(dwell,function(z){integrate_slip_rate(screen_interval,weibull_shape,z)}),
+           # for the clinically diagnosed stage, halve the dwell time left for early-detection testing to
+           # calculate prob of slip before final clinical detection
            slip_clinical=sapply(dwell*0.5,function(z){integrate_slip_rate(screen_interval,weibull_shape,z)}),
            screen_interval=screen_interval)
   

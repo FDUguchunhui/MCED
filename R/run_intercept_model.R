@@ -2,7 +2,8 @@ xStage <- c("I", "II", "III", "IV")
 
 # dictionary:
 # prequel: stage at early-detection test
-# clinical: clinical stage
+# clinical: clinical stage/original clinical presentation stage/clinically diagnosed stage/usual-care 
+# dignosed stage
 
 #okay: this multiplies a final destination IR: all the people who wind up at some final destination
 #so everything scales within itself
@@ -53,18 +54,70 @@ effective_sens <- function(cumulative_sens, dwell_detect_rate) {
 #' It then computes absolute numbers of survivors and deaths before and after a hypothetical shift in detection stage
 #' @param incidence_sens_source incidence_sens_source
 #' @param incidence_intercepted incidence_intercepted
+#' @details
+#' #' #' incidence_sens_source
+#' | Cancer   | Stage | IR    | Survival | c | n | sens  | iso_sens |
+#' |----------|-------|-------|----------|---|---|-------|----------|
+#' | Anus     | I     | 1.20  | 0.909    | 1 | 3 | 0.333 | 0.333    |
+#' | Anus     | II    | 1.82  | 0.821    | 1 | 3 | 0.333 | 0.333    |
+#' | Anus     | III   | 1.61  | 0.672    | 3 | 5 | 0.6   | 0.6      |
+#' | Anus     | IV    | 0.503 | 0.235    | 0 | 0 | 1     | 1        |
+#' | Bladder  | I     | 12.1  | 0.862    | 3 | 5 | 0.545 | 0.545    |
+#' | Bladder  | II    | 5.50  | 0.618    | 2 | 3 | 0.545 | 0.545    |
+#' | Bladder  | III   | 2.20  | 0.495    | 1 | 2 | 0.545 | 0.545    |
+#' | Bladder  | IV    | 4.06  | 0.163    | 0 | 1 | 0.545 | 0.545    |
+#' 
+#' # incidence_intercepted:
+# Cancer| Stage| clinical| prequel| detect  |delta_detect| modified_slip| sens_slip| found_clinical|  IR | caught
+# ------|------| --------|--------|-------- |------------|--------------|----------|---------------|-----|-------
+# Anus  | I    |  1      | 1      |  0.333  |    0.202   |   0.393      |  0.202   |    1          | 1.2 | 0.242
+# Anus  | I    |  1      | 1      |  0.333  |    0.798   |   0.393      |  0.202   |    2          | 1.2 | 0.956
+# Anus  | II   |  2      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 1.8 | 0.472
+# Anus  | II   |  2      | 2      |  0.6    |    0.125   |   0.632      |  0.125   |    1          | 1.8 | 0.228
+# Anus  | II   |  2      | 2      |  0.6    |    0.615   |   0.632      |  0.125   |    2          | 1.8 | 1.12
+# Anus  | III  |  3      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 1.6 | 0.418
+# Anus  | III  |  3      | 2      |  0.6    |    0.206   |   0.393      |  0.206   |    1          | 1.6 | 0.333
+# Anus  | III  |  3      | 3      |  1      |    0.0723  |   0.865      |  0.0723  |    1          | 1.6 | 0.116
+# Anus  | III  |  3      | 3      |  1      |    0.462   |   0.865      |  0.0723  |    2          | 1.6 | 0.744
+# Anus  | IV   |  4      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 0.50| 0.130
 add_survival_to_stage_shift <-
   function(incidence_sens_source,
            incidence_intercepted) {
+    # browser()
+    
     #add survival: original before shift, and shifted survival
     #using 5 year survival as "crude estimate of statistical cure"
     #unlikely to be affected by 1-2 year lead time significantly
     #extract survival by 'stage_at_detection'
+   # just_survival:
+   # |    |  Cancer  | prequel| Survival
+   # | 1  |  Anus    |   1    |  0.909
+   # | 2  |  Anus    |   2    |  0.821
+   # | 3  |  Anus    |   3    |  0.672
+   # | 4  |  Anus    |   4    |  0.235
+   # | 5  |  Bladder |   1    |  0.862
+   # | 6  |  Bladder |   2    |  0.618
+   # | 7  |  Bladder |   3    |  0.495
+   # | 8  |  Bladder |   4    |  0.163
+   # | 9  |  Breast  |   1    |  0.982
+   # | 10 |  Breast  |   2    |  0.929
     just_survival <- incidence_sens_source %>%
       mutate(prequel = match(Stage, xStage)) %>%
       select(Cancer, prequel, Survival) %>%
       filter(!is.na(prequel))
     
+    #  intercept_survival:
+    #   Cancer| Stage|    IR |number_stage| clinical| prequel| found_clinical| caught| s_survival| c_survival
+    # 1  Anus |  I   |  1.20 |      1     |   1     |  1     |        1      |  0.242|      0.909|    0.909
+    # 2  Anus |  I   |  1.20 |      1     |   1     |  1     |        2      |  0.956|      0.909|    0.909
+    # 3  Anus |  II  |  1.82 |      2     |   2     |  1     |        1      |  0.472|      0.909|    0.821
+    # 4  Anus |  II  |  1.82 |      2     |   2     |  2     |        1      |  0.228|      0.821|    0.821
+    # 5  Anus |  II  |  1.82 |      2     |   2     |  2     |        2      |  1.12 |      0.821|    0.821
+    # 6  Anus |  III |  1.61 |      3     |   3     |  1     |        1      |  0.418|      0.909|    0.672
+    # 7  Anus |  III |  1.61 |      3     |   3     |  2     |        1      |  0.333|      0.821|    0.672
+    # 8  Anus |  III |  1.61 |      3     |   3     |  3     |        1      |  0.116|      0.672|    0.672
+    # 9  Anus |  III |  1.61 |      3     |   3     |  3     |        2      |  0.744|      0.672|    0.672
+    # 10 Anus |  IV  | 0.503 |      4     |   4     |  1     |        1      |  0.130|      0.909|    0.235
     intercept_survival <- incidence_intercepted %>%
       left_join(
         just_survival %>%
@@ -78,6 +131,20 @@ add_survival_to_stage_shift <-
       )
     
     #compute absolute numbers rather than local rates
+    # five year survival rate and death rate (per 1 million)
+    # intercept_survival:
+    # Cancer | Stage |  IR  | caught | c_survival | s_survival | original_survivors | shifted_survivors | original_deaths| shifted_deaths
+    # -------|-------|------|--------|------------|------------|--------------------|-------------------|----------------|--------------
+    # Anus   |   I   | 1.20 |  0.242 |      0.909 |      0.909 |       0.220        |             0.220 |      0.0221    |    0.0221
+    # Anus   |   I   | 1.20 |  0.956 |      0.909 |      0.909 |       0.869        |             0.869 |      0.0872    |    0.0872
+    # Anus   |  II   | 1.82 |  0.472 |      0.821 |      0.909 |       0.388        |             0.429 |      0.0434    |    0.0434
+    # Anus   |  II   | 1.82 |  0.228 |      0.821 |      0.821 |       0.187        |             0.187 |      0.0406    |    0.0406
+    # Anus   |  II   | 1.82 |  1.12  |      0.821 |      0.821 |       0.918        |             0.918 |       0.200    |     0.200
+    # Anus   | III   | 1.61 |  0.418 |      0.672 |      0.909 |       0.281        |             0.380 |       0.137    |    0.1381
+    # Anus   | III   | 1.61 |  0.333 |      0.672 |      0.821 |       0.224        |             0.273 |       0.109    |    0.0594
+    # Anus   | III   | 1.61 |  0.116 |      0.672 |      0.672 |       0.0783       |             0.0783|      0.0381    |    0.0381
+    # Anus   | III   | 1.61 |  0.744 |      0.672 |      0.672 |       0.500        |             0.500 |       0.244    |     0.244
+    # Anus   |  IV   | 0.503|  0.130 |      0.235 |      0.909 |       0.0307       |             0.119 |      0.0998    |    0.0119
     intercept_survival <- intercept_survival %>%
       mutate(
         original_survivors = c_survival * caught,
@@ -312,11 +379,27 @@ run_intercept_model <-
                                             dwell_slip_df,
                                             active_slip_clinical)
     
-    #updated: split effective slip rate in 2 for last stage
-    #as the "time spent" should be halved
+  
+    # browser()
+    
+    #updated: split effective slip rate in 2 for last stage as the "time spent" should be halved
     #this involves a more elaborate model
     #note that "lives saved" is not affected, because those individuals are not stage shifted
     #this assumes that 'stage 4' is just automatically halved anyway
+    # incidence_intercepted:
+    # Cancer| Stage| clinical| prequel| detect  |delta_detect| modified_slip| sens_slip| found_clinical|  IR | caught
+    # ------|------| --------|--------|-------- |------------|--------------|----------|---------------|-----|-------
+    # Anus  | I    |  1      | 1      |  0.333  |    0.202   |   0.393      |  0.202   |    1          | 1.2 | 0.242
+    # Anus  | I    |  1      | 1      |  0.333  |    0.798   |   0.393      |  0.202   |    2          | 1.2 | 0.956
+    # Anus  | II   |  2      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 1.8 | 0.472
+    # Anus  | II   |  2      | 2      |  0.6    |    0.125   |   0.632      |  0.125   |    1          | 1.8 | 0.228
+    # Anus  | II   |  2      | 2      |  0.6    |    0.615   |   0.632      |  0.125   |    2          | 1.8 | 1.12
+    # Anus  | III  |  3      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 1.6 | 0.418
+    # Anus  | III  |  3      | 2      |  0.6    |    0.206   |   0.393      |  0.206   |    1          | 1.6 | 0.333
+    # Anus  | III  |  3      | 3      |  1      |    0.0723  |   0.865      |  0.0723  |    1          | 1.6 | 0.116
+    # Anus  | III  |  3      | 3      |  1      |    0.462   |   0.865      |  0.0723  |    2          | 1.6 | 0.744
+    # Anus  | IV   |  4      | 1      |  0.333  |    0.260   |   0.221      |  0.260   |    1          | 0.50| 0.130
+                   
     incidence_intercepted <- incidence_set %>%
       left_join(just_slip_delta_extra, by = c("Cancer", "clinical", "prequel")) %>%
       # Duplicates rows when clinical stage == prequel into two, and the new found_clinical will take value 1 or 2.
@@ -331,7 +414,7 @@ run_intercept_model <-
         c_slip = cumsum(sens_slip),
         # c_slip calculate cumulative slip-adjusted sensitivity for group (Cancer, clinical) for all prequel stages
         # since the last row of each group is the expanded row for clinical stage == prequel for remaining individuals
-        # that diagnosed clinically, it has to be removed when calculating delta_detect in found_clinical == 2
+        # that diagnosed clinically at original clinical presentation stage, it has to be removed when calculating delta_detect in found_clinical == 2
         # so found_clinical == 2 ~ 1 - c_slip + sens_slip has a "plus sens_slip" part
         # delta_detect in this table represent percentage of cancers that are detected by early-detection screen at
         # each stage after adjusting for modified slip rate
@@ -350,6 +433,14 @@ run_intercept_model <-
   }
 
 
+#' @title Fill in performance results for cancers without stage information
+#' @description all cases are considered as clinical diagnosed (found_clinical = 2)
+#' @param excluded_source data frame with individuals not staged as they are not modeled
+#' @details
+#' there is no survival and death improvement for using early-detection (s_survival = c_survival, s_death = c_death)
+#' 
+#' 
+#' @return data frame with survival estimates
 run_excluded_model <- function(excluded_source) {
   #fills out individuals not staged as they are not modeled
   excluded_survival <- excluded_source %>%

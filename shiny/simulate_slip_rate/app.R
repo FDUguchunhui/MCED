@@ -2,6 +2,7 @@ library(shiny)
 library(DT)
 library(tidyverse)
 library(ggalluvial)
+library(ggplot2)
 library(patchwork)
 
 # source R files with local argument set to TRUE otherwise function from sourced file cannot access shiny app environment
@@ -132,7 +133,7 @@ ui <- fluidPage(
     shifted_deaths: incidence dying after 5 years based on shifted stage <br>
     dw_scenario: dwell time scenario, "MIS": maximum interception scenario,"VSlow": very slow,"AggFast": aggressively fast <br>
     scan: Type of screening year: incident/prevalent/no screening <br>
-    mode_found: cfdna or soc (matches found_clinical) <br>
+    mode_found: cfdna or soc (matches found_clinical) cfdna: incidence found by cfdna screening; soc: incidence found by usual care<br>
     aggressive:	dwell time scenario in words'
     )
   ),
@@ -189,17 +190,44 @@ server <- function(input, output) {
   
   # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval ------------------------------------------------
   output$weibull_dist_plot <- renderPlot({
+    par(mfrow=c(1,2))
     weibull_shape <- input$weibull_shape
     screen_interval <- input$screen_interval
-    x <- seq(0, 5, 0.1)
-    y <- dweibull(x, shape = weibull_shape, scale = screen_interval)
-    plot(x,
-         y,
-         type = "l",
-         xlab = "years",
-         ylab = "failure probability")
-    abline(v = screen_interval, col = "red")
-    abline(h = 0.5, col = "red")
+    dwell_scale <- 4/gamma(1+1/weibull_shape)
+    x <- seq(0, 5, 0.01)
+    
+    y_density <- dweibull(x, shape = weibull_shape, scale = dwell_scale)
+    cum_prob <- pweibull(x, shape = weibull_shape, scale = dwell_scale)
+    # Create data frames for ggplot
+    density_data <- data.frame(x, y_density)
+    cum_prob_data <- data.frame(x, cum_prob)
+    
+    base_theme <- theme_minimal(base_size = 16) +
+      theme(
+        plot.title = element_text(size = 20),
+        axis.title = element_text(size = 18),
+        axis.text = element_text(size = 16)
+      )
+    
+    # First plot: Weibull density
+    p1 <- ggplot(density_data, aes(x = x, y = y_density)) +
+      geom_line() +
+      xlab("Years") +
+      ylab("Slip density") +
+      ggtitle("Weibull Density", subtitle = 'Plot with Dwell=4 for example') +
+      base_theme
+    
+    # Second plot: Weibull cumulative probability
+    p2 <- ggplot(cum_prob_data, aes(x = x, y = cum_prob)) +
+      geom_line() +
+      geom_vline(xintercept = screen_interval, color = "red", linetype = "dashed") +
+      xlab("Years") +
+      ylab("Cumulative Slip Probability") +
+      ggtitle("Weibull Cumulative Probability") +
+      base_theme
+    
+    # Arrange the plots side by side using patchwork
+    p1 + p2
   })
   
   
@@ -381,103 +409,62 @@ server <- function(input, output) {
   
 
   # Step 5: plot flow diagram Figure 1 in paper -----------------------------------------
-
+  
   plot_flow_diagram <- reactive({
     
     global_figure_scale <- 7.5
     global_box_scale <- 0.045
     global_text_scale <- 1.35
-    color_caught = c("intercept" = "plum",
-                     "clinical" = "grey80")
+    color_caught <- c("intercept" = "plum", "clinical" = "grey80")
     
     slip_rate_df <- dwell_slip_rate()
-
+    
     diagram_setup <- set_up_diagram_clean(color_caught = color_caught)
     par(mfrow = c(2, 2))
-    # par(mar = c(0, 0, 1, 1))  # Adjust the margin (bottom, left, top, right)
-    # par(oma = c(0, 0, 2, 0))  # Adjust the outer margin (bottom, left, top, right)
     
-    #1A
-    my_locus <-
-      blank_intercept_para(diagram_setup, "State-Transition Graph", local_box_size =
-                             global_box_scale)
+    # 1A
+    my_locus <- blank_intercept_para(diagram_setup, "State-Transition Graph", local_box_size = global_box_scale)
     
-    #simply fill in the boxes with the identity
-    text(diagram_setup$map$x,
-         diagram_setup$map$y,
-         diagram_setup$map$name,
-         cex = global_text_scale)
+    # Simply fill in the boxes with the identity
+    text(diagram_setup$map$x, diagram_setup$map$y, diagram_setup$map$name, cex = global_text_scale)
     
-    #1B
-    dw_scenario <- 0  #start with pure scenario
+    # 1B
+    dw_scenario <- 0  # Start with pure scenario
     
-    local_slip_rate_df <- slip_rate_df %>%
-      filter(scenario == dw_scenario)
-    
-    #browser()
+    local_slip_rate_df <- slip_rate_df %>% filter(scenario == dw_scenario)
     
     my_title <- "No Interception"
-    no_intercept_flow <-
-      intercept_with_flow(incidence_sens_source,
-                          local_slip_rate_df,
-                          intercept_start_at_stage = 0)
-    #start plotting
-    my_locus <-
-      blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
-    plot_object_flow_tuned(
-      no_intercept_flow,
-      diagram_setup,
-      my_locus,
-      flow_up_to_stage = 4,
-      cex_scale = global_text_scale
-    )
+    no_intercept_flow <- intercept_with_flow(incidence_sens_source, local_slip_rate_df, intercept_start_at_stage = 0)
     
+    # Start plotting
+    my_locus <- blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
+    plot_object_flow_tuned(no_intercept_flow, diagram_setup, my_locus, flow_up_to_stage = 4, cex_scale = global_text_scale)
     
-    ##1C
-    dw_scenario <- 0  #start with pure scenario
+    # 1C
+    dw_scenario <- 0  # Start with pure scenario
     
-    local_slip_rate_df <- slip_rate_df %>%
-      filter(scenario == dw_scenario)
+    local_slip_rate_df <- slip_rate_df %>% filter(scenario == dw_scenario)
     
     my_title <- "Interception Model: MIS"
-    mis_flow <-
-      intercept_with_flow(incidence_sens_source,
-                          local_slip_rate_df,
-                          intercept_start_at_stage = 4)
-    my_locus <-
-      blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
-    plot_object_flow_tuned(
-      mis_flow,
-      diagram_setup,
-      my_locus,
-      flow_up_to_stage = 4,
-      cex_scale = global_text_scale
-    )
+    mis_flow <- intercept_with_flow(incidence_sens_source, local_slip_rate_df, intercept_start_at_stage = 4)
     
-    ## 1D
+    my_locus <- blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
+    plot_object_flow_tuned(mis_flow, diagram_setup, my_locus, flow_up_to_stage = 4, cex_scale = global_text_scale)
+    
+    # 1D
     flow_up_to_stage <- 4
     my_title <- "Interception Model: Fast"
-    #now use a finite slip rate scenario
-    dw_scenario <- 3  #start with pure scenario
-    local_slip_rate_df <- slip_rate_df %>%
-      filter(scenario == dw_scenario)
     
-    fast_flow <-
-      intercept_with_flow(incidence_sens_source,
-                          local_slip_rate_df,
-                          intercept_start_at_stage = 4)
-    #start plotting
-    #start plotting
-    my_locus <-
-      blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
-    final_plot <-
-      plot_object_flow_tuned(
-        fast_flow,
-        diagram_setup,
-        my_locus,
-        flow_up_to_stage = 4,
-        cex_scale = global_text_scale
-      )
+    # Now use a finite slip rate scenario
+    dw_scenario <- 3  # Start with pure scenario
+    local_slip_rate_df <- slip_rate_df %>% filter(scenario == dw_scenario)
+    
+    fast_flow <- intercept_with_flow(incidence_sens_source, local_slip_rate_df, intercept_start_at_stage = 4)
+    
+    # Start plotting
+    my_locus <- blank_intercept_para(diagram_setup, my_title, local_box_size = global_box_scale)
+    final_plot <- plot_object_flow_tuned(fast_flow, diagram_setup, my_locus, flow_up_to_stage = 4, cex_scale = global_text_scale)
+    
     return(final_plot)
   })
   
@@ -677,8 +664,9 @@ server <- function(input, output) {
   
   sens_table <- reactive({
     a_intercept() %>% 
+      filter(Cancer %in% c('Breast', 'Colon/Rectum', 'Esophagus', 'Liver/Bile-duct', 'Lung',
+                           'Ovary', 'Pancreas', 'Stomach')) %>% 
       group_by(Cancer, clinical, prequel) %>% summarise(caught=sum(caught)) %>%
-      mutate(total_at_corresponding_prequel=sum(caught)) %>% 
       group_by(Cancer, clinical) %>%
       mutate(total_at_corresponding_prequel = sum(caught)) %>%
       mutate(prob_at_prequel = caught / total_at_corresponding_prequel) %>%

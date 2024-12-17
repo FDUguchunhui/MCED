@@ -124,31 +124,31 @@ incident	AggFast	Thyroid	0	25	25	0	3	2
 incident	AggFast	Plasma Cell Neoplasm	0	18	18	0	2	2
 incident	AggFast	Lymphoid Leukemia	0	17	17	0	2	1
 incident	AggFast	Myeloid Neoplasm	0	15	15	0	2	1
-no	MIS	Prostate	0	207	207	NaN	17	17
-no	MIS	Breast	0	174	174	NaN	15	15
-no	MIS	Lung	0	163	163	NaN	14	14
-no	MIS	Colon/Rectum	0	102	102	NaN	9	9
-no	MIS	[OTHER]	0	71	71	NaN	6	6
-no	MIS	Melanoma	0	54	54	NaN	5	5
-no	MIS	Lymphoma	0	50	50	NaN	4	4
-no	MIS	Head and Neck	0	43	43	NaN	4	4
-no	MIS	Kidney	0	41	41	NaN	3	3
-no	MIS	Uterus	0	40	40	NaN	3	3
-no	MIS	Pancreas	0	32	32	NaN	3	3
-no	MIS	Liver/Bile-duct	0	26	26	NaN	2	2
-no	MIS	Thyroid	0	25	25	NaN	2	2
-no	MIS	Bladder	0	24	24	NaN	2	2
-no	MIS	Ovary	0	19	19	NaN	2	2
-no	MIS	Stomach	0	18	18	NaN	2	2
-no	MIS	Plasma Cell Neoplasm	0	18	18	NaN	2	2
-no	MIS	Lymphoid Leukemia	0	17	17	NaN	1	1
-no	MIS	Myeloid Neoplasm	0	15	15	NaN	1	1
-no	MIS	Esophagus	0	13	13	NaN	1	1
-no	MIS	Sarcoma	0	12	12	NaN	1	1
-no	MIS	Gallbladder	0	8	8	NaN	1	1
-no	MIS	Cervix	0	6	6	NaN	1	1
-no	MIS	Anus	0	5	5	NaN	0	0
-no	MIS	Urothelial Tract	0	4	4	NaN	0	0
+no	MIS	Prostate	0	207	207	NA	17	17
+no	MIS	Breast	0	174	174	NA	15	15
+no	MIS	Lung	0	163	163	NA	14	14
+no	MIS	Colon/Rectum	0	102	102	NA	9	9
+no	MIS	[OTHER]	0	71	71	NA	6	6
+no	MIS	Melanoma	0	54	54	NA	5	5
+no	MIS	Lymphoma	0	50	50	NA	4	4
+no	MIS	Head and Neck	0	43	43	NA	4	4
+no	MIS	Kidney	0	41	41	NA	3	3
+no	MIS	Uterus	0	40	40	NA	3	3
+no	MIS	Pancreas	0	32	32	NA	3	3
+no	MIS	Liver/Bile-duct	0	26	26	NA	2	2
+no	MIS	Thyroid	0	25	25	NA	2	2
+no	MIS	Bladder	0	24	24	NA	2	2
+no	MIS	Ovary	0	19	19	NA	2	2
+no	MIS	Stomach	0	18	18	NA	2	2
+no	MIS	Plasma Cell Neoplasm	0	18	18	NA	2	2
+no	MIS	Lymphoid Leukemia	0	17	17	NA	1	1
+no	MIS	Myeloid Neoplasm	0	15	15	NA	1	1
+no	MIS	Esophagus	0	13	13	NA	1	1
+no	MIS	Sarcoma	0	12	12	NA	1	1
+no	MIS	Gallbladder	0	8	8	NA	1	1
+no	MIS	Cervix	0	6	6	NA	1	1
+no	MIS	Anus	0	5	5	NA	0	0
+no	MIS	Urothelial Tract	0	4	4	NA	0	0
 prevalent	VSlow	Lung	416	57	473	17	7	15
 prevalent	VSlow	Head and Neck	407	5	413	17	1	13
 prevalent	VSlow	Colon/Rectum	302	38	340	12	5	11
