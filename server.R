@@ -4,7 +4,7 @@ render_dt <- function(data, editable = 'cell', server = TRUE, ...) {
 }
 
 # Define the origin host directory and stages
-origin_host_dir <- '../../.'
+origin_host_dir <- '.'
 xStage <- c("I", "II", "III", "IV")
 
 # Read the data
@@ -12,16 +12,16 @@ dwell_model_group_df <- read_tsv(sprintf("%s/data/20200728_dwell_time_groups.tsv
 dwell_model_timing_df <- read_tsv(sprintf("%s/data/20200728_dwell_group_timing.tsv", origin_host_dir))
 
 # source R files with local argument set to TRUE otherwise function from sourced file cannot access shiny app environment
-source("../../scripts/current_date_code.R", local = TRUE)
-source("../../R/slip_rate_from_dwell.R", local = TRUE)
-source("../../R/run_intercept_model.R", local = TRUE)
-source("../../R/reconstruct_flow_in_detail.R", local = TRUE)
-source("../../R/plot_flow_diagrams.R", local = TRUE)
-source("../../R/utility_sankey_plot.R", local = TRUE)
+source("scripts/current_date_code.R", local = TRUE)
+source("R/slip_rate_from_dwell.R", local = TRUE)
+source("R/run_intercept_model.R", local = TRUE)
+source("R/reconstruct_flow_in_detail.R", local = TRUE)
+source("R/plot_flow_diagrams.R", local = TRUE)
+source("R/utility_sankey_plot.R", local = TRUE)
 
 # global variables -----------------------------------------------------------
 
-origin_host_dir = '../../.'
+origin_host_dir = '.'
 #read in standard performance numbers
 base_detect_code <- "CCGA2"
 #load and clean manuscript sensitivity

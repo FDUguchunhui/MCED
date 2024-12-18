@@ -1,0 +1,10 @@
+name: simulate_slip_rate
+title:
+username: chunhuigu
+account: chunhuigu
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13620333
+bundleId: 9542168
+url: https://chunhuigu.shinyapps.io/simulate_slip_rate/
+version: 1
