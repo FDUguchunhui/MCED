@@ -1,4 +1,5 @@
 library(shiny)
+library(shinydashboard)
 library(DT)
 library(tidyverse)
 library(ggalluvial)
@@ -13,146 +14,139 @@ source("../../R/reconstruct_flow_in_detail.R", local = TRUE)
 source("../../R/plot_flow_diagrams.R", local = TRUE)
 source("../../R/utility_sankey_plot.R", local = TRUE)
 
-
-
 # global variables -----------------------------------------------------------
-
 origin_host_dir = '../../.'
-#read in standard performance numbers
+# read in standard performance numbers
 base_detect_code <- "CCGA2"
-#load and clean manuscript sensitivity
-iso_sens_joined <-
-  read_tsv(
-    sprintf(
-      "%s/generated_data/%s_iso_seer_manuscript.tsv",
-      origin_host_dir,
-      input_date_code
-    )
-  )
-#remove everything not staged for initial analysis
-incidence_sens_source <- iso_sens_joined %>%
-  filter(Stage != "NotStaged") %>%
-  mutate(iso_sens = sens)
-
-
-#keep not staged for adding back
-incidence_excluded_source <- iso_sens_joined %>%
-  filter(Stage == "NotStaged")
+# load and clean manuscript sensitivity
+iso_sens_joined <- read_tsv(sprintf("%s/generated_data/%s_iso_seer_manuscript.tsv", origin_host_dir, input_date_code))
+# remove everything not staged for initial analysis
+incidence_sens_source <- iso_sens_joined %>% filter(Stage != "NotStaged") %>% mutate(iso_sens = sens)
+# keep not staged for adding back
+incidence_excluded_source <- iso_sens_joined %>% filter(Stage == "NotStaged")
 
 # ui.R ----------------------------------------------------------------------
-ui <- fluidPage(
-  
-  # Application title
-  h1("Interception model"),
-  p(
-    "This page will guide you through the process of simulated intercepted
-    cancer cases and deaths at each stage and cancer type."
-  ),
-  
-  h1('Step1: Load dwell standard model configuration csv file'),
-  titlePanel("Load dwell standard_model configuration csv file"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      width = 3,
-      fileInput("file", "Choose a CSV file"),
-      br(),
-      actionButton("loadFile", "Load File")
-    ),
-    
-    mainPanel(DTOutput("table"))
-  ),
-  
-  h1('Step 2: Isotonic regression adjusted Senstivity table'),
-  p(
-    'Assumption: ensitivity estimates are nondecreasing by increasing stage for each cancer type;
-  estimates were adjusted by isotonic regression weighted by the number of observations available per stage.'
-  ),
-  dataTableOutput("sens_table"),
-  
-  h2("Dictionary of variables"),
-  p(
-    HTML(
-      'Cancer:	Cancer sensitivity group <br>
-    Stage:	AJCC stage(I-IV) or NotStaged for no standard staging <br>
-    IR:	Imputed incidence rate per 100K individuals from SEER <br>
-    Survival:	5 year cancer specific survival <br>
-    c:	Cancers successfully detected <br>
-    n: Number of attempts <br>
-    sens: original sensitivity of multi-cancer early dectection test <br>
-    iso_sens:	Weighted isotonic regression estimate of sensitivity'
-    )
-  ),
-  
-  
-  h1('Step 3: Set dwell time parameters'),
-  
-  
-  fluidRow(# Copy the line below to make a slider bar
-    column(
-      6,
-      sliderInput(
-        "weibull_shape",
-        label = h3("Weibull shape"),
-        min = 0.001,
-        max = 5,
-        value = 1
+ui <- dashboardPage(
+  dashboardHeader(title = "Interception Model"),
+  dashboardSidebar(disable = TRUE),
+  dashboardBody(
+    fluidPage(
+      box(
+        title = "Introduction",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        p("This page will guide you through the process of simulated intercepted cancer cases and deaths at each stage and cancer type.")
+      ),
+      box(
+        title = "Step 1: Load Dwell Standard Model Configuration CSV File",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        sidebarLayout(
+          sidebarPanel(
+            width = 3,
+            fileInput("file", "Choose a CSV file"),
+            br(),
+            actionButton("loadFile", "Load File")
+          ),
+          mainPanel(DTOutput("table"))
+        ),
+        p(HTML('The dwell time for each cancer is defined by which dwell group it belong to and the progress scenario
+               this table is to show the final configuration of the dwell time for each cancer type. <br>')),
+        p(HTML('Cancer: Cancer sensitivity group <br>
+               dwell_group: the pre-defined dwell group, each dwell group has a fixed dwell time for stage 1-4 <br>
+               scenario: 1."VSlow": very slow, 2. slow 3. Fast 4. "AggFast": aggressively fast  <br>
+               stage: the character stage name <br>
+               number_stage: the numerical representative of the stage I: 1, II: 2, III: 3, IV: 4 <br>'))
+      ),
+      box(
+        title = "Step 2: Isotonic Regression Adjusted Sensitivity Table",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        p('Assumption: Sensitivity estimates are nondecreasing by increasing stage for each cancer type; estimates were adjusted by isotonic regression weighted by the number of observations available per stage.'),
+        dataTableOutput("sens_table"),
+        p(HTML('Cancer: Cancer sensitivity group <br>
+               Stage: AJCC stage(I-IV) or NotStaged for no standard staging <br>
+               IR: Imputed incidence rate per 100K individuals from SEER <br>
+               Survival: 5 year cancer specific survival <br>
+               c: Cancers successfully detected <br>
+               n: Number of attempts <br>
+               sens: original sensitivity of multi-cancer early detection test <br>
+               iso_sens: Weighted isotonic regression estimate of sensitivity'))
+      ),
+      box(
+        title = "Step 3: Set Dwell Time Parameters",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        fluidRow(
+          column(
+            6,
+            sliderInput("weibull_shape", label = h3("Weibull shape"), min = 0.001, max = 5, value = 1)
+          ),
+          column(
+            6,
+            sliderInput("screen_interval", label = h3("Screen interval (years)"), min = 0.5, max = 5, value = 1)
+          )
+        ),
+        plotOutput("weibull_dist_plot"),
+        p(HTML('Weibull shape: shape parameter of the Weibull distribution <br>
+               Screen interval: interval between screening events in years'))
+      ),
+      box(
+        title = "Step 4: Simulate Performance",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        style = "overflow-x: auto;",
+        downloadButton("downloadTable4", "Download Table 4"),
+        dataTableOutput("simulated_data"),
+        p(HTML('Cancer: Cancer sensitivity group <br>
+         clinical: Number of stage of original clinical presentation (1-4), 0 for NotStaged <br>
+         prequel: Number of stage at interception (1-4), 0 for NotStaged <br>
+         found_clinical: 1 = intercepted, 2 = clinical presentation <br>
+         caught: Incidence intercepted at this prequel from clinical with method found_clinical <br>
+         s_survival: shifted survival after interception <br>
+         c_survival: original cancer survival <br>
+         original_survivors: incidence surviving 5 years based on original stage <br>
+         shifted_survivors: incidence surviving 5 years based on shifted stage <br>
+         original_deaths: incidence dying after 5 years based on original stage <br>
+         shifted_deaths: incidence dying after 5 years based on shifted stage <br>
+         dw_scenario: dwell time scenario, "MIS": maximum interception scenario,"VSlow": very slow,"AggFast": aggressively fast <br>
+         scan: Type of screening year: incident/prevalent/no screening <br>
+         mode_found: cfdna or soc (matches found_clinical) cfdna: incidence found by cfdna screening; soc: incidence found by usual care<br>
+         aggressive: dwell time scenario in words'))
+      ),
+      box(
+        title = "Step 5: Reconstruct Flow Diagrams",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        plotOutput("flow_diagram", height = "auto")
+      ),
+      box(
+        title = "Step 6: Utility Sankey Plot",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        selectInput("sankey_plot_scenario", label = h3("Select scenario"), 
+                    choices = list("MIS" = 1, "Very Slow" = 2, "Slow" = 3, 'Fast' = 4, 'Aggressively fast' = 5), 
+                    selected = 1),
+        plotOutput("utility_sankey_plot", height = "auto")
+      ),
+      box(
+        title = "Step 7: Sensitivity Analysis by Cancer",
+        status = "primary",
+        solidHeader = TRUE,
+        width = 12,
+        downloadButton("download_stage_shift_table", "Download stage shift table"),
+        dataTableOutput("stage_shifting_table")
       )
-    ),
-    
-    column(
-      6,
-      sliderInput(
-        "screen_interval",
-        label = h3("Screen interval (years)"),
-        min = 0.5,
-        max = 5,
-        value = 1
-      )
-    )),
-  
-  # plot the  Weibull distribution and plot failure probability based on input Weibull shape and screen interval
-  plotOutput("weibull_dist_plot"),
-  
-  h1('Step 4: Simulate performance'),
-  downloadButton("downloadTable4", "Download Table 4"),
-  dataTableOutput("simulated_data"),
-  h2("Dictionary of variables"),
-  p(
-    HTML(
-      'Cancer:	Cancer sensitivity group <br>
-    clinical:	Number of stage of original clinical presentation (1-4), 0 for NotStaged <br>
-    prequel:	Number of stage at interception (1-4), 0 for NotStaged <br>
-    found_clinical:	1 = intercepted, 2 = clinical presentation <br>
-    caught:	Incidence intercepted at this prequel from clinical with method found_clinical <br>
-    s_survival: shifted survival after interception <br>
-    c_survival: original cancer survival <br>
-    original_survivors: incidence surviving 5 years based on original stage <br>
-    shifted_survivors: incidence surviving 5 years based on shifted stage <br>
-    original_deaths: incidence dying after 5 years based on original stage <br>
-    shifted_deaths: incidence dying after 5 years based on shifted stage <br>
-    dw_scenario: dwell time scenario, "MIS": maximum interception scenario,"VSlow": very slow,"AggFast": aggressively fast <br>
-    scan: Type of screening year: incident/prevalent/no screening <br>
-    mode_found: cfdna or soc (matches found_clinical) cfdna: incidence found by cfdna screening; soc: incidence found by usual care<br>
-    aggressive:	dwell time scenario in words'
     )
-  ),
-  
-  h1('Step 5: Reconstruct flow diagrams'),
-  plotOutput("flow_diagram", height = "auto"),
-  
-  h1('Step 6: Utility Sankey plot'),
-  selectInput("sankey_plot_scenario", label = h3("Select scenario"), 
-              choices = list("MIS" = 1, "Very Slow" = 2, "Slow" = 3, 'Fast'=4, 'Aggressively fast'=5), 
-              selected = 1),
-  plotOutput("utility_sankey_plot", height = "auto"),
-  
-  
-  h1('Step 7: Sensitivity analysis by cancer'),
-  downloadButton("download_stage_shift_table", "Download stage shift table"),
-  dataTableOutput("stage_shifting_table"),
+  )
 )
-
 
 # server.R ------------------------------------------------------------------
 server <- function(input, output) {
@@ -214,7 +208,7 @@ server <- function(input, output) {
       geom_line() +
       xlab("Years") +
       ylab("Slip density") +
-      ggtitle("Weibull Density", subtitle = 'Plot with Dwell=4 for example') +
+      ggtitle("Slip density", subtitle = 'Plot with Dwell=4 for example') +
       base_theme
     
     # Second plot: Weibull cumulative probability
@@ -223,7 +217,7 @@ server <- function(input, output) {
       geom_vline(xintercept = screen_interval, color = "red", linetype = "dashed") +
       xlab("Years") +
       ylab("Cumulative Slip Probability") +
-      ggtitle("Weibull Cumulative Probability") +
+      ggtitle("Cumulative Slip Probability") +
       base_theme
     
     # Arrange the plots side by side using patchwork
@@ -393,7 +387,7 @@ server <- function(input, output) {
   
   output$simulated_data <- renderDataTable({
     rich_survival()
-  })
+  }, options = list(pageLength = 10, scrollX = TRUE, scrollY = TRUE))
   
   # download the simulated data
   output$downloadTable4 <- downloadHandler(
